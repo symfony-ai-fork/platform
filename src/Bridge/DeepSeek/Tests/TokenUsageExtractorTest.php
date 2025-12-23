@@ -9,13 +9,16 @@
  * file that was distributed with this source code.
  */
 
-namespace Symfony\AI\Platform\Bridge\Ollama\Tests;
+namespace Symfony\AI\Platform\Tests\Bridge\DeepSeek;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\AI\Platform\Bridge\Ollama\TokenUsageExtractor;
+use Symfony\AI\Platform\Bridge\DeepSeek\TokenUsageExtractor;
 use Symfony\AI\Platform\Result\InMemoryRawResult;
 use Symfony\AI\Platform\TokenUsage\TokenUsage;
 
+/**
+ * @author Oskar Stark <oskarstark@googlemail.com>
+ */
 final class TokenUsageExtractorTest extends TestCase
 {
     public function testItHandlesStreamResponsesWithoutProcessing()
@@ -36,43 +39,38 @@ final class TokenUsageExtractorTest extends TestCase
     {
         $extractor = new TokenUsageExtractor();
         $result = new InMemoryRawResult([
-            'model' => 'foo',
-            'response' => 'Hello World!',
-            'done' => true,
-            'prompt_eval_count' => 10,
-            'eval_count' => 10,
+            'usage' => [
+                'prompt_tokens' => 10,
+                'completion_tokens' => 20,
+                'total_tokens' => 30,
+                'prompt_cache_hit_tokens' => 5,
+            ],
         ]);
 
         $tokenUsage = $extractor->extract($result);
 
         $this->assertInstanceOf(TokenUsage::class, $tokenUsage);
         $this->assertSame(10, $tokenUsage->getPromptTokens());
-        $this->assertSame(10, $tokenUsage->getCompletionTokens());
+        $this->assertSame(20, $tokenUsage->getCompletionTokens());
+        $this->assertSame(5, $tokenUsage->getCachedTokens());
+        $this->assertSame(30, $tokenUsage->getTotalTokens());
     }
 
-    public function testItExtractsTokenUsageFromStreamResult()
+    public function testItHandlesMissingUsageFields()
     {
         $extractor = new TokenUsageExtractor();
-
-        $result = new InMemoryRawResult([], [
-            [
-                'model' => 'foo',
-                'response' => 'First chunk',
-                'done' => false,
-            ],
-            [
-                'model' => 'foo',
-                'response' => 'Hello World!',
-                'done' => true,
-                'prompt_eval_count' => 10,
-                'eval_count' => 10,
+        $result = new InMemoryRawResult([
+            'usage' => [
+                'prompt_tokens' => 10,
             ],
         ]);
 
-        $tokenUsage = $extractor->extract($result, ['stream' => true]);
+        $tokenUsage = $extractor->extract($result);
 
         $this->assertInstanceOf(TokenUsage::class, $tokenUsage);
         $this->assertSame(10, $tokenUsage->getPromptTokens());
-        $this->assertSame(10, $tokenUsage->getCompletionTokens());
+        $this->assertNull($tokenUsage->getCompletionTokens());
+        $this->assertNull($tokenUsage->getCachedTokens());
+        $this->assertNull($tokenUsage->getTotalTokens());
     }
 }
